@@ -85,56 +85,43 @@
 #' predict(species_fit, penguins) 
 #' # What is the total prediction accuracy?
 #' sum(predict(species_fit, penguins) == penguins$species) / nrow(penguins)
+#' @importFrom rsample validation_split
 #' @export
-dglm <- function(dataset, 
+dglm <- function(data, 
                  formula, 
-                 hidden_layers = integer(), 
-                 hidden_layers_activation = 
-                   rep("linear", length(hidden_layers)),
+                 hidden_layers = integer(),
+                 hidden_activations = rep(nn_linear, length(layers)),
                  hidden_layer_names = 
                    paste("hidden_layer", seq_along(hidden_layers), sep = "_"),
                  hidden_layer_bias = rep(TRUE, length(hidden_layers)),
                  loss = NULL,
-                 optimizer = optimizer_adadelta(),
+                 optimizer = optim_adam,
                  metrics = NULL, 
                  output_activation = NULL,
                  output_activation_bias = TRUE,
                  batch_size = nrow(data),
                  epochs = 1000,
                  verbose = FALSE,
-                 validation_split = 0.2,
-                 callbacks = 
-                  list(
-                    callback_early_stopping(min_delta = 0.1, 
-                                            patience = 500,
-                                            restore_best_weights = TRUE)),
-                 name = NULL) {
+                 validation_prop= 3/4,
+                 strata = NULL,
+                 breaks = 4,
+                 checkpointer = NULL,
+                 ...) {
 
-  xf <- model.frame(formula, data)
+  # Create the dataset
+  
+  ds <- formula_data(data, formula, ...)
 
-  var_desc <- make_variable_desc(xf, formula)
+  check_hidden_layers(hidden_layers, hidden_activations, hidden_names)
 
-  error_on_more_than_one_dep_var(var_desc)
-  error_on_no_indep_var(var_desc)
-  error_on_conditional_var(var_desc)
-  error_on_unsupported_dependent_var(var_desc, c("numeric", "factor"))
-  error_on_bad_hidden_layer_desc(hidden_layers, hidden_layers_activation)
-
-  x_train <- make_model_matrix(formula, xf)
-
-  # make sure there is an intercept, if not warning
-  mm_column_var_assign <- attributes(x_train)$assign
-  column_var_name <- names(xf)
-  mm_column_var_name <- colnames(x_train)
-
-  model <- 
-    create_input_and_hidden_layers(
-      x_train, 
+  # See https://www.rdocumentation.org/packages/torch/versions/0.2.1/topics/nn_module_list
+  latent_model <- 
+    create_latent_model(
+      ds, 
       hidden_layers,
       hidden_layers_activation,
       hidden_layer_names,
-      hidden_layer_bias,
-      name)
+      hidden_layer_bias)
 
   if (var_desc$class[var_desc$role == "dependent"] == "factor") {
 
