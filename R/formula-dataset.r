@@ -1,56 +1,58 @@
-#' @title Create a Torch Dataset from a Data Frame and Formula
-#' @export
-tt_formula_dataset <- function(x, formula, ...) {
-  UseMethod("formula_dataset", x)
-}
-
-tt_formula_dataset.default <- function(x, formula, ...) {
-  stop("Don't know how to make a formula_dataset from an object of type ",
-       paste(class(x), collapse = " "), ".")
-}
-
 # Note that unused levels need to be removed before this function is
 # called. Also, no Na's
 
 #' @title Create a Torch Dataset from a Model Matrix
 #' @export
-tt_model_matrix_dataset <- dataset(
-  "tt_model_matrix_dataset",
+model_matrix_dataset <- dataset(
+  "model_matrix_dataset",
 
-  initialize = function(y_train, x_train, y_test, x_test, y_name, 
-                        x_names, y_0 = typeof(a)) {
+  initialize = function(
+    x_train, 
+    y_train, 
+    x_test = NULL, 
+    y_test = NULL, 
+    x_name = NULL,
+    x_mm_name = NULL,
+    y_name = NULL,
+    x_0 = NULL,
+    y_0 = NULL,
+    formula = NULL,
+    na_action = NULL,
+    mm_attr = NULL) {
+
     self$x_train <- x_train
     self$y_train <- y_train
     self$x_test <- x_test
     self$y_test <- y_test
-    self$x_names <- x_names
+    self$x_name <- x_name
+    self$x_mm_name <- x_mm_name
     self$y_name <- y_name
-    self$y_0
+    self$x_0 <- x_0
+    self$y_0 <- y_0
+    self$formula <- formula
+    self$na_action <- na_action
+    self$mm_attr <- mm_attr
   },
 
   .getitem = function(i) {
-    list(y_train = self$y_train[i,,drop = FALSE], 
-         x_train = self$x_train[i,,drop = FALSE])
+    list(x_train = self$x_train[i,,drop = FALSE],
+         y_train = self$y_train[i,,drop = FALSE])
   },
   
   .length = function() {
     self$x_train$shape[1]
   },
 
-  var_names = function() {
-    list(y = self$y_name, x = self$x_names)
-  },
-
-  y_0 = function() {
-    self$y_0
-  },
-
   train = function() {
-    list(y_train = self$y_train, x_train = self$x_train)
+    list(
+      x_train = self$x_train,
+      y_train = self$y_train)
   },
 
   test = function() {
-    list(y_test = self$y_test, x_test = self$x_test)
+    list(
+      x_test = self$x_test,
+      y_test = self$y_test) 
   }
 )
 
@@ -59,21 +61,48 @@ remove_intercept <- function(mm) {
     stop("The intercept should be removed with the bias argument.")
   } else {
     i_col <- which("(Intercept)" == colnames(mm))
-    mm[, -i_col, drop = FALSE]
+    mm_attr <- attributes(mm)
+    mm <- mm[, -i_col, drop = FALSE]
+    mm_attr$dimnames[[2]] <- mm_attr$dimnames[[2]][-i_col]
+    mm_attr$assign <- mm_attr$assign[-1]
+    mm_attr$dim[2] <- mm_attr$dim[2] - 1
+    attributes(mm) <- mm_attr
+    mm
   }
 }
 
+#' @title Create a Torch Dataset from a Data Frame and Formula
+#' @export
+formula_dataset <- function(x, formula, ...) {
+  UseMethod("formula_dataset", x)
+}
+
+#' @export
+formula_dataset.default <- function(x, formula, ...) {
+  stop("Don't know how to make a formula_dataset from an object of type ",
+       paste(class(x), collapse = " "), ".")
+}
+
 #' @importFrom Formula Formula model.part
-#' @importFrom rsample validation_split
-tt_formula_dataset.data.frame <- function(x, formula, prop = 3/4, 
-  strata = NULL, breaks = 4, 
-  contrasts_arg = NULL, na_action = na.fail, xlev = NULL, ...) {
+#' @importFrom rsample validation_split analysis assessment
+#' @importFrom tibble as_tibble
+#' @importFrom stats na.fail
+#' @export
+formula_dataset.data.frame <- function(x, formula, prop = 0.8, 
+  strata = NULL, breaks = 4, contrasts_arg = NULL, na_action = na.fail, 
+  xlev = NULL, ...) {
 
   mf <- model.frame(formula = formula, data = x, na.action = na_action, 
                     xlev = xlev)
 
-  vs <- validation_split(data = mf, prop = prop, strata = strata, 
-                         breaks = breaks)
+  if (0 < prop && prop < 1) {
+    vs <- validation_split(data = mf, prop = prop, strata = strata, 
+                           breaks = breaks)
+  } else if (prop == 1) {
+    browser()
+  } else {
+    stop("prop must be (0,1]")
+  }
 
   mm_train <- 
     remove_intercept(
@@ -96,7 +125,7 @@ tt_formula_dataset.data.frame <- function(x, formula, prop = 3/4,
   x_test <- torch_tensor(mm_test)
 
   form <- Formula(formula)
-  dep_var <- model.part(form, mf, lhs = 1)
+  dep_var <- names(model.part(form, mf, lhs = 1))
   if (length(dep_var) > 1) {
     stop("Only one dependent variable should be specified.")
   }
@@ -107,15 +136,26 @@ tt_formula_dataset.data.frame <- function(x, formula, prop = 3/4,
     stop("Ordered factors are not yet supported.")
   } else if (is.numeric(mf[[dep_var]])) {
     y_train <- 
-      torch_tensor(matrix(analysis(mf$splits[[1]])[[dep_var]], ncol = 1))
+      torch_tensor(matrix(analysis(vs$splits[[1]])[[dep_var]], ncol = 1))
     y_test <- 
-      torch_tensor(matrix(assessment(mf$splits[[1]])[[dep_var]], ncol = 1))
+      torch_tensor(matrix(assessment(vs$splits[[1]])[[dep_var]], ncol = 1))
   } else {
     stop("Don't know how to handle dependent variable of type ", 
          paste(class(x[[dep_var]]), collapse = " "), ".")
   }
 
-  tt_model_matrix_dataset(y_train, x_train, y_test, y_train, 
-                          dep_var, colnames(mm_test), mf[[dep_var]][c()])
+  x_name <- names(model.part(form, mf, rhs = NULL))
+  model_matrix_dataset(
+    x_train, 
+    y_train, 
+    x_test, 
+    y_test, 
+    x_name = x_name,
+    x_mm_name = colnames(mm_train),
+    y_name = dep_var, 
+    x_0 = as_tibble(mf[c(), x_name]),
+    y_0 = as_tibble(mf[[dep_var]][c()]), 
+    na_action = na_action,
+    mm_attr <- attributes(mm_train))
 }
 

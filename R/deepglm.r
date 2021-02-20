@@ -35,19 +35,16 @@
 #' the length of the vector specifies the number of hidden nodes and 
 #' the element values specify how many nodes should be included at each hidden
 #' layer.
-#' @param data a `data.frame` (or derived) object whose columns correpsond to 
-#' variables referenced in the `formula` argument.
+#' @param ds a torch dataset or `data.frame` (or derived) object whose columns 
+#' correpsond to variables referenced in the `formula` argument.
 #' @param formula a `formula` giving a symbolic description of the model to
 #' be fitted.
 #' @param hidden_layers a vector whose length corresponds to the number of 
 #' hidden layers in the resulting model and whose values tell how many nodes
 #' should added at the respective hidden layer. The default `integer()`
 #' corresponds to a model with no hidden layers - a generalized linear model.
-#' @param hidden_layer_activation the activations for each of the hidden 
-#' layers (k_softmax for example). See the `keras` documentation for a 
-#' complete list. By default linear activation is chosen.
-#' @param hidden_layer_names the names of each of hidden layers. This 
-#' option allows the user to reference and examine outputs of hidden layers.
+#' @param hidden_layer_activation the activations. See the {torch} 
+#' documentation for a complete list. By default linear activation is chosen.
 #' @param hidden_layer_bias a vector of boolean values indicating if bias 
 #' correction should be performed at each hidden layer.
 #' @param loss the loss function used to fit the model.
@@ -55,23 +52,20 @@
 #' @param metrics the metrics to show while training the model and evaluating
 #' the training history.
 #' @param output_activation the activation for the output layer. By default,
-#' keras::loss_mean_squared_error is chosen if the output is continuous or
-#' count_model is `TRUE` and keras::loss_categorical_crossentropy is chosen if 
+#' mean squared error is chosen if the output is continuous or
+#' count_model is `TRUE` and categorical crossentropy is chosen if 
 #' the output is categorical,
 #' @param batch_size the number of contiguous samples to use when calculating
 #' the gradient in the gradient descent procedure.
 #' @param epochs the number of times to iterate through the complete data set.
 #' @param verbose should extra information, like the metrics per epoch, 
 #' be written to the output. The default is TRUE.
-#' @param valdation_split the percent the proporation of data to use to
+#' @param training_prop the percent the proporation of data to use to
 #' evaluate (rather than train) a model. The default is 0.2 (20\%).
 #' @param count_model is the dependent variable count data? By default,
 #' if the dependent variable is non-negative and integer or an 
 #' ordered factor, this will be set to true.
 #' @param name the name of the model.
-#' @importFrom fu make_variable_desc
-#' @importFrom keras keras_model_sequential layer_dense %>% compile fit
-#' optimizer_adadelta loss_mean_squared_error loss_categorical_crossentropy
 #' @examples
 #' library(palmerpenguins)
 #' 
@@ -87,12 +81,10 @@
 #' sum(predict(species_fit, penguins) == penguins$species) / nrow(penguins)
 #' @importFrom rsample validation_split
 #' @export
-dglm <- function(data, 
+dglm <- function(ds, 
                  formula, 
                  hidden_layers = integer(),
                  hidden_activations = rep(nn_linear, length(layers)),
-                 hidden_layer_names = 
-                   paste("hidden_layer", seq_along(hidden_layers), sep = "_"),
                  hidden_layer_bias = rep(TRUE, length(hidden_layers)),
                  loss = NULL,
                  optimizer = optim_adam,
@@ -102,15 +94,58 @@ dglm <- function(data,
                  batch_size = nrow(data),
                  epochs = 1000,
                  verbose = FALSE,
-                 validation_prop= 3/4,
+                 training_prop= 0.8,
                  strata = NULL,
                  breaks = 4,
                  checkpointer = NULL,
                  ...) {
 
-  # Create the dataset
-  
-  ds <- formula_data(data, formula, ...)
+  UseMethod("dglm", ds)
+}
+
+dglm.default <- function(ds, 
+                 formula, 
+                 hidden_layers,
+                 hidden_activations,
+                 hidden_layer_bias,
+                 loss,
+                 optimizer,
+                 metrics,
+                 output_activation,
+                 output_activation_bias,
+                 batch_size,
+                 epochs,
+                 verbose,
+                 training_prop,
+                 strata,
+                 breaks,
+                 checkpointer,
+                 ...) {
+
+  stop("Unsupported data set type", paste0(class(ds), collapse = " "))
+}
+
+dglm.data.frame <- function(ds,
+                 formula,
+                 hidden_layers,
+                 hidden_activations,
+                 hidden_layer_bias,
+                 loss,
+                 optimizer,
+                 metrics,
+                 output_activation,
+                 output_activation_bias,
+                 batch_size,
+                 epochs,
+                 verbose,
+                 validation_prop,
+                 strata,
+                 breaks,
+                 checkpointer,
+                 ...) {
+#  ds <- tt_formula_dataset(data, formula)
+ 
+  browser() 
 
   check_hidden_layers(hidden_layers, hidden_activations, hidden_names)
 
@@ -234,7 +269,7 @@ plot_training_history.default <- function(x, metrics, smooth, theme_bw) {
 #' @importFrom tools toTitleCase
 #' @export
 plot_training_history.deepglm <- function(x, metrics = NULL, 
-    smooth = getOption("keras.plot.history.smooth", TRUE), 
+    smooth = TRUE,
     theme_bw = FALSE) {
 
   df <- as.data.frame(x$history)

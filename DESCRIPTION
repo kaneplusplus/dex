@@ -1,20 +1,25 @@
-Package: tdglm
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: 
-    person(given = "First",
-           family = "Last",
-           role = c("aut", "cre"),
-           email = "first.last@example.com",
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+Package: dex
+Title: Deep Extensions to Regression Models
+Version: 0.0.1
+Authors@R: c(
+  person("Michael J.", "Kane",
+    role = c("aut", "cph", "cre"),
+    email = "michael.kane@yale.edu",
+    comment = c(ORCID = "http://orcid.org/0000-0003-1899-6662")
+    ))
+Description: Create deep learners using the lm/glm/coxph interface.
 License: LGPL (>= 2.1)
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Depends:
+  checkmate,
+  tibble,
   torch
 Suggests: 
+  palmerpenguins,
   testthat (>= 3.0.0)
+URL: https://github.com/kaneplusplus/dex
+BugReports: https://github.com/kaneplusplus/dex/issues
 Config/testthat/edition: 3
