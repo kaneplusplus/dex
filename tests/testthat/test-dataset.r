@@ -29,3 +29,5 @@ test_that(
 })
 
 fd <- formula_dataset(iris, Sepal.Length ~ .)
+
+fd <- formula_dataset(iris, Species ~ .)

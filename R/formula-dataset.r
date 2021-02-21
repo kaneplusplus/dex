@@ -131,14 +131,30 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
   }
 
   if (is.factor(mf[[dep_var]]) && !is.ordered(mf[[dep_var]])) {
-    stop("Factors are not yet supported.")
+    num_levels <- length(levels(mf[[dep_var]]))
+
+    to_one_hot <- . %>%
+      as.integer() %>%
+      torch_tensor() %>%
+      nnf_one_hot(num_classes = num_levels)
+      
+    y_train <- analysis(vs$splits[[1]])[[dep_var]] %>% to_one_hot()
+
+    y_test <- assessment(vs$splits[[1]])[[dep_var]] %>% to_one_hot()
+
   } else if (is.factor(mf[[dep_var]]) && !is.ordered(mf[[dep_var]])) {
     stop("Ordered factors are not yet supported.")
   } else if (is.numeric(mf[[dep_var]])) {
-    y_train <- 
-      torch_tensor(matrix(analysis(vs$splits[[1]])[[dep_var]], ncol = 1))
-    y_test <- 
-      torch_tensor(matrix(assessment(vs$splits[[1]])[[dep_var]], ncol = 1))
+
+    to_dependent <- . %>%
+      matrix(ncol = 1) %>%
+      torch_tensor()
+
+    y_train <- analysis(vs$splits[[1]])[[dep_var]] %>% to_dependent()
+      matrix(ncol = 1) %>%
+      torch_tensor()
+    y_test <- assessment(vs$splits[[1]])[[dep_var]] %>% to_dependent()
+      
   } else {
     stop("Don't know how to handle dependent variable of type ", 
          paste(class(x[[dep_var]]), collapse = " "), ".")
@@ -156,6 +172,6 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
     x_0 = as_tibble(mf[c(), x_name]),
     y_0 = as_tibble(mf[[dep_var]][c()]), 
     na_action = na_action,
-    mm_attr <- attributes(mm_train))
+    mm_attr = attributes(mm_train))
 }
 
