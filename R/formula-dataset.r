@@ -139,8 +139,11 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
       nnf_one_hot(num_classes = num_levels)
       
     y_train <- analysis(vs$splits[[1]])[[dep_var]] %>% to_one_hot()
+    # To cast to float.
+    y_train <- y_train + torch_zeros(y_train$shape)
 
     y_test <- assessment(vs$splits[[1]])[[dep_var]] %>% to_one_hot()
+    y_test <- y_test + torch_zeros(y_test$shape)
 
   } else if (is.factor(mf[[dep_var]]) && !is.ordered(mf[[dep_var]])) {
     stop("Ordered factors are not yet supported.")
