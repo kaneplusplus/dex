@@ -165,7 +165,7 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
   mm_train <- value(mm_trainf)
   x_train <- torch_tensor(mm_train)
 
-  mm_test<- value(mm_test)
+  mm_test<- value(mm_testf)
   x_test <- torch_tensor(mm_test)
 
   x_name <- names(model.part(form, mf, rhs = NULL))
