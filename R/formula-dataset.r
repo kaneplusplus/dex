@@ -87,6 +87,7 @@ formula_dataset.default <- function(x, formula, ...) {
 #' @importFrom rsample validation_split analysis assessment
 #' @importFrom tibble as_tibble
 #' @importFrom stats na.fail
+#' @importFrom future future value
 #' @export
 formula_dataset.data.frame <- function(x, formula, prop = 0.8, 
   strata = NULL, breaks = 4, contrasts_arg = NULL, na_action = na.fail, 
@@ -104,25 +105,23 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
     stop("prop must be (0,1]")
   }
 
-  mm_train <- 
-    remove_intercept(
-      model.matrix(
-        formula, 
-        analysis(vs$splits[[1]]), 
-        contrasts.arg = contrasts_arg, 
-        xlev = xlev))
+  mm_trainf <- 
+    future(
+      remove_intercept(
+        model.matrix(
+          formula, 
+          analysis(vs$splits[[1]]), 
+          contrasts.arg = contrasts_arg, 
+          xlev = xlev)))
 
-  mm_test <- 
-    remove_intercept(
-      model.matrix(
-        formula, 
-        assessment(vs$splits[[1]]), 
-        contrasts.arg = contrasts_arg, 
-        xlev = xlev))
-
-  x_train <- torch_tensor(mm_train)
-
-  x_test <- torch_tensor(mm_test)
+  mm_testf <- 
+    future(
+      remove_intercept(
+        model.matrix(
+          formula, 
+          assessment(vs$splits[[1]]), 
+          contrasts.arg = contrasts_arg, 
+          xlev = xlev)))
 
   form <- Formula(formula)
   dep_var <- names(model.part(form, mf, lhs = 1))
@@ -162,6 +161,12 @@ formula_dataset.data.frame <- function(x, formula, prop = 0.8,
     stop("Don't know how to handle dependent variable of type ", 
          paste(class(x[[dep_var]]), collapse = " "), ".")
   }
+
+  mm_train <- value(mm_trainf)
+  x_train <- torch_tensor(mm_train)
+
+  mm_test<- value(mm_test)
+  x_test <- torch_tensor(mm_test)
 
   x_name <- names(model.part(form, mf, rhs = NULL))
   model_matrix_dataset(

@@ -16,6 +16,7 @@ RoxygenNote: 7.1.1
 Depends:
   checkmate,
   Formula,
+  future,
   tibble,
   torch
 Suggests: 
