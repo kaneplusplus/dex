@@ -2,6 +2,7 @@
 # called. Also, no Na's
 
 #' @title Create a Torch Dataset from a Model Matrix
+#' @importFrom torch dataset
 #' @export
 model_matrix_dataset <- dataset(
   "model_matrix_dataset",
